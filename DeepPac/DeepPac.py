@@ -82,7 +82,7 @@ class basicAgent(CaptureAgent):
         foodCarry = gameState.getAgentState(self.index).numCarrying
 
         #back home
-        if foodCarry <= 2:
+        if foodCarry >= 2:
             bestDist = 9999
             for action in actions:
                 successor = self.getSuccessor(gameState, action)
