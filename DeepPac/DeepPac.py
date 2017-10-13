@@ -86,7 +86,7 @@ class basicAgent(CaptureAgent):
             return self.backhome(gameState, actions)
 
 
-        self.debugDraw(self.getdenfenceFoodArea(gameState), (.4,0.13,0.91))
+        # self.debugDraw(self.getdenfenceFoodArea(gameState), (.4,0.13,0.91), True)
         print(self.getdenfenceFoodArea(gameState))
 
         return random.choice(bestActions)
