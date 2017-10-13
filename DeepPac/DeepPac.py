@@ -124,7 +124,9 @@ class sillyAgent(basicAgent):
         successor = self.getSuccessor(gameState, action)
 
         foodList = self.getFood(successor).asList()
-        features['successorScore'] = self.getScore(successor)
+        features['successorScore'] = -len(foodList)
+        print('food', -len(foodList))
+        print('score', self.getScore(successor))
 
         if len(foodList) > 0:
             myPos = successor.getAgentState(self.index).getPosition()
