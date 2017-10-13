@@ -135,13 +135,28 @@ class basicAgent(CaptureAgent):
         CaptureAgent.registerInitialState(self, gameState)
 
         #### Our initialization code ####
+        self.walls = gameState.getWalls()
+        self.wallsPosition = self.walls.asList(True)
+        self.noWallsPosition = self.walls.asList(False)
+        self.width = self.walls.width
+        self.height = self.walls.height
+
+
+
+
+
 
 
 
 
         ######## Test Field #########
-        if TEST_INFO_PRINT:
-            print('Test')
+        if True:
+            print('#####Test Field#####')
+
+            print(self.opponents)
+
+            print('######Test End######')
+            exit()
         #############################
 
     #important. for choosing the action
