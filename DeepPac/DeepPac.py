@@ -82,19 +82,21 @@ class basicAgent(CaptureAgent):
         foodCarry = gameState.getAgentState(self.index).numCarrying
 
         #back home
-        if foodCarry >= 2:
-            bestDist = 9999
-            for action in actions:
-                successor = self.getSuccessor(gameState, action)
-                pos2 = successor.getAgentPosition(self.index)
-                dist = self.getMazeDistance(self.start,pos2)
-                if dist < bestDist:
-                    bestAction = action
-                    bestDist = dist
-            return bestAction
-
-        print(bestActions)
+        if foodCarry >= 1:
+            return self.backhome(gameState, actions)
         return random.choice(bestActions)
+
+    def backhome(self, gameState, acitons):
+        bestDist = 9999
+        for action in actions:
+            successor = self.getSuccessor(gameState, action)
+            pos2 = successor.getAgentPosition(self.index)
+            dist = self.getMazeDistance(self.start,pos2)
+            if dist < bestDist:
+                bestAction = action
+                bestDist = dist
+        return bestAction
+
 
     def getSuccessor(self, gameState, action):
         successor = gameState.generateSuccessor(self.index, action)
