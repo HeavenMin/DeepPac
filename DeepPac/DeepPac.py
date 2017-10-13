@@ -36,7 +36,7 @@ import game
 #################
 
 def createTeam(firstIndex, secondIndex, isRed,
-               first = 'sillyAgent', second = 'sillyAgent'):
+               first = 'sillyAgent', second = 'DefensiveReflexAgent'):
   """
   This function should return a list of two agents that will form the
   team, initialized using firstIndex and secondIndex as their agent
@@ -82,8 +82,13 @@ class basicAgent(CaptureAgent):
         foodCarry = gameState.getAgentState(self.index).numCarrying
 
         #back home
-        if foodCarry >= 1:
+        if foodCarry >= 4:
             return self.backhome(gameState, actions)
+
+
+        self.debugDraw(self.getdenfenceFoodArea(gameState), (.4,0.13,0.91))
+        print(self.getdenfenceFoodArea(gameState))
+
         return random.choice(bestActions)
 
     def backhome(self, gameState, actions):
@@ -121,6 +126,20 @@ class basicAgent(CaptureAgent):
     def getWeights(self, gameState, action):
         return {'successorScore': 1.0}
 
+    def getdenfenceFoodArea(self, gameState):
+        our_food = self.getFoodYouAreDefending(gameState).asList()
+        our_food_distance = [self.getMazeDistance(gameState.getAgentPosition(
+                             self.index), food) for food in our_food]
+
+        nearest_food = our_food[0]
+        nearest_distance = our_food_distance[0]
+
+        for i, food_distance in enumerate(our_food_distance):
+            if food_distance < nearest_distance:
+                nearest_food = our_food[i]
+                nearest_distance = our_food_distance[i]
+        return nearest_food
+
 class sillyAgent(basicAgent):
 
     def getFeatures(self, gameState, action):
@@ -148,7 +167,42 @@ class sillyAgent(basicAgent):
 
 
 
+# copy code need delete
+class DefensiveReflexAgent(basicAgent):
+  """
+  A reflex agent that keeps its side Pacman-free. Again,
+  this is to give you an idea of what a defensive agent
+  could be like.  It is not the best or only way to make
+  such an agent.
+  """
 
+  def getFeatures(self, gameState, action):
+    features = util.Counter()
+    successor = self.getSuccessor(gameState, action)
+
+    myState = successor.getAgentState(self.index)
+    myPos = myState.getPosition()
+
+    # Computes whether we're on defense (1) or offense (0)
+    features['onDefense'] = 1
+    if myState.isPacman: features['onDefense'] = 0
+
+    # Computes distance to invaders we can see
+    enemies = [successor.getAgentState(i) for i in self.getOpponents(successor)]
+    invaders = [a for a in enemies if a.isPacman and a.getPosition() != None]
+    features['numInvaders'] = len(invaders)
+    if len(invaders) > 0:
+      dists = [self.getMazeDistance(myPos, a.getPosition()) for a in invaders]
+      features['invaderDistance'] = min(dists)
+
+    if action == Directions.STOP: features['stop'] = 1
+    rev = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
+    if action == rev: features['reverse'] = 1
+
+    return features
+
+  def getWeights(self, gameState, action):
+    return {'numInvaders': -1000, 'onDefense': 100, 'invaderDistance': -10, 'stop': -100, 'reverse': -2}
 
 
 #END
