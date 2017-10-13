@@ -79,9 +79,10 @@ class basicAgent(CaptureAgent):
 
         #get num of food left
         foodLeft = len(self.getFood(gameState).asList())
+        foodCarry = gameState.getAgentState(self.index).numCarrying
 
         #back home
-        if foodLeft <= 2:
+        if foodCarry <= 2:
             bestDist = 9999
             for action in actions:
                 successor = self.getSuccessor(gameState, action)
@@ -92,6 +93,7 @@ class basicAgent(CaptureAgent):
                     bestDist = dist
             return bestAction
 
+        print(bestActions)
         return random.choice(bestActions)
 
     def getSuccessor(self, gameState, action):
@@ -125,8 +127,6 @@ class sillyAgent(basicAgent):
 
         foodList = self.getFood(successor).asList()
         features['successorScore'] = -len(foodList)
-        print('food', -len(foodList))
-        print('score', self.getScore(successor))
 
         if len(foodList) > 0:
             myPos = successor.getAgentState(self.index).getPosition()
