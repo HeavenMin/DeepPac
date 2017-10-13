@@ -135,6 +135,7 @@ class basicAgent(CaptureAgent):
         CaptureAgent.registerInitialState(self, gameState)
 
         #### Our initialization code ####
+        self.startPosition = gameState.getAgentPosition(self.index)
         self.walls = gameState.getWalls()
         self.wallsPosition = self.walls.asList(True)
         self.noWallsPosition = self.walls.asList(False)
@@ -148,9 +149,8 @@ class basicAgent(CaptureAgent):
 
 
 
-
         ######## Test Field #########
-        if True:
+        if False:
             print('#####Test Field#####')
 
             print(self.opponents)
@@ -189,7 +189,7 @@ class basicAgent(CaptureAgent):
         for action in actions:
             successor = self.getSuccessor(gameState, action)
             pos2 = successor.getAgentPosition(self.index)
-            dist = self.getMazeDistance(self.start,pos2)
+            dist = self.getMazeDistance(startPosition, pos2)
             if dist < bestDist:
                 bestAction = action
                 bestDist = dist
