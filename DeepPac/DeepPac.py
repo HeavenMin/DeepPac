@@ -127,7 +127,7 @@ class sillyAgent(basicAgent):
         features['successorScore'] = self.getScore(successor)
 
         if len(foodList) > 0:
-            myPos = successor.getAgentState(self.index).getPosition
+            myPos = successor.getAgentState(self.index).getPosition()
             minFoodDistance = min([self.getMazeDistance(myPos, food) for food in foodList])
             features['distanceToFood'] = minFoodDistance
         return features
