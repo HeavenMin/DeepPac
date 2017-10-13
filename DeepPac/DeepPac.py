@@ -27,13 +27,15 @@ __author__ = 'DeepPac'
 from captureAgents import CaptureAgent
 import distanceCalculator
 import random, time, util, sys
-from game import Directions
+from game import Directions, Actions
 from util import nearestPoint
 import game
 
 #################
 # Team creation #
 #################
+
+TEST_INFO_PRINT = True
 
 def createTeam(firstIndex, secondIndex, isRed,
                first = 'sillyAgent', second = 'DefensiveReflexAgent'):
@@ -59,35 +61,111 @@ def createTeam(firstIndex, secondIndex, isRed,
 # Agents #
 ##########
 
+# for debug, draw a debug square
+def draw(agent, positions, color='r'):
+    if color == 'r':
+        agent.debugDraw(positions, (.9,0,0), True)
+    if color == 'b':
+        agent.debugDraw(positions, (0,.3,.9), True)
+    if color == 'o':
+        agent.debugDraw(positions, (.98,.41,.07), True)
+    if color == 'g':
+        agent.debugDraw(positions, (.1,.75,.7), True)
+    if color == 'y':
+        agent.debugDraw(positions, (1.0,0.6,0.0), True)
+
+# a list of food you need to eat
+def getFood(gameState, agent):
+    return agent.getFood(gameState).asList()
+
+# a list of food you need to defend
+def getFoodYouAreDefending(gameState, agent):
+    return agent.getFoodYouAreDefending(gameState).asList()
+
+# int, num of food left
+def getFoodLeft(gameState, agent):
+    return len(agent.getFood(gameState).asList())
+
+# int, number of carrying food for a agent
+def getFoodCarry(gameState, agent_index):
+    return gameState.getAgentState(agent_index).numCarrying
+
+# True of False, if a agent is a pacman
+def isPacman(gameState, agent_index):
+    return gameState.getAgentState(agent_index).isPacman
+
+# int, the scared time for a ghost left
+def scaredTimeLeft(gameState, agent_index):
+    return gameState.getAgentState(agent_index).scaredTimer
+
+# (int, int) position(x, y)
+def getAgentPosition(gameState, agent_index):
+    return gameState.getAgentPosition(agent_index)
+
+# whether two agent are across corners
+def acrossCorners(pos1, pos2):
+    return abs(pos1[0] - pos2[0]) == 1 and abs(pos1[1] - pos2[1])
+
+###############################################################################
+##################################  Our Agent #################################
+###############################################################################
+
 class basicAgent(CaptureAgent):
 
+    #init
     def registerInitialState(self, gameState):
-        self.start = gameState.getAgentPosition(self.index)
+        """
+        This method handles the initial setup of the
+        agent to populate useful fields (such as what team
+        we're on).
+
+        A distanceCalculator instance caches the maze distances
+        between each pair of positions, so your agents can use:
+        self.distancer.getDistance(p1, p2)
+
+        IMPORTANT: This method may run for at most 15 seconds.
+        """
+
+        '''
+        Make sure you do not delete the following line. If you would like to
+        use Manhattan distances instead of maze distances in order to save
+        on initialization time, please take a look at
+        CaptureAgent.registerInitialState in captureAgents.py.
+        '''
         CaptureAgent.registerInitialState(self, gameState)
 
+        #### Our initialization code ####
+
+
+
+
+        ######## Test Field #########
+        if TEST_INFO_PRINT:
+            print('Test')
+        #############################
+
+    #important. for choosing the action
     def chooseAction(self, gameState):
         #get legal action list
         actions = gameState.getLegalActions(self.index)
 
         # to evaluation time
-        start_time = time.time()
+        if TEST_INFO_PRINT:
+            start_time = time.time()
         values = [self.evaluate(gameState, a) for a in actions]
-        print 'eval time for agent %d: %.4f' % (self.index, time.time() - start_time)
+        if TEST_INFO_PRINT:
+            print 'eval time for agent %d: %.4f' % (self.index, time.time() - start_time)
 
         maxValue = max(values)
         bestActions = [a for a, v in zip(actions, values) if v == maxValue]
 
         #get num of food left
-        foodLeft = len(self.getFood(gameState).asList())
-        foodCarry = gameState.getAgentState(self.index).numCarrying
+        foodLeft = getFoodLeft(gameState, self)
+        foodCarry = getFoodCarry(gameState, self.index)
 
         #back home
         if foodCarry >= 4:
             return self.backhome(gameState, actions)
-
-
-        # self.debugDraw(self.getdenfenceFoodArea(gameState), (.4,0.13,0.91), True)
-        print(self.getdenfenceFoodArea(gameState))
 
         return random.choice(bestActions)
 
@@ -101,6 +179,70 @@ class basicAgent(CaptureAgent):
                 bestAction = action
                 bestDist = dist
         return bestAction
+
+    def myaStarSearch(self, gameState, firstPos, goalPos):
+        walls = gameState.getWalls()
+        mapWidth = walls.width
+        mapHeight = walls.height
+        wallList = walls.asList()
+
+
+
+
+
+
+
+
+
+
+
+
+
+    def aStarSearch(self, startPosition, gameState, goalPositions, avoidPositions=[], returnPosition=False):
+        """
+        Finds the distance between the agent with the given index and its nearest goalPosition
+        """
+        walls = gameState.getWalls()
+        width = walls.width
+        height = walls.height
+        walls = walls.asList()
+
+        actions = [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]
+        actionVectors = [Actions.directionToVector(action) for action in actions]
+        # Change action vectors to integers so they work correctly with indexing
+        actionVectors = [tuple(int(number) for number in vector) for vector in actionVectors]
+
+        # Values are stored a 3-tuples, (Position, Path, TotalCost)
+
+        currentPosition, currentPath, currentTotal = startPosition, [], 0
+        # Priority queue uses the maze distance between the entered point and its closest goal position to decide which comes first
+        queue = util.PriorityQueueWithFunction(lambda entry: entry[2] +   # Total cost so far
+                                               width * height if entry[0] in avoidPositions else 0 +  # Avoid enemy locations like the plague
+                                               min(util.manhattanDistance(entry[0], endPosition) for endPosition in goalPositions))
+
+        # Keeps track of visited positions
+        visited = set([currentPosition])
+
+        while currentPosition not in goalPositions:
+
+            possiblePositions = [((currentPosition[0] + vector[0], currentPosition[1] + vector[1]), action) for vector, action in zip(actionVectors, actions)]
+            legalPositions = [(position, action) for position, action in possiblePositions if position not in walls]
+
+            for position, action in legalPositions:
+                if position not in visited:
+                    visited.add(position)
+                    queue.push((position, currentPath + [action], currentTotal + 1))
+
+            # This shouldn't ever happen...But just in case...
+            if len(queue.heap) == 0:
+                return None
+            else:
+                currentPosition, currentPath, currentTotal = queue.pop()
+
+        if returnPosition:
+            return currentPath, currentPosition
+        else:
+            return currentPath
 
 
     def getSuccessor(self, gameState, action):
@@ -126,7 +268,7 @@ class basicAgent(CaptureAgent):
     def getWeights(self, gameState, action):
         return {'successorScore': 1.0}
 
-    def getdenfenceFoodArea(self, gameState):
+    def getnearestOurFood(self, gameState):
         our_food = self.getFoodYouAreDefending(gameState).asList()
         our_food_distance = [self.getMazeDistance(gameState.getAgentPosition(
                              self.index), food) for food in our_food]
@@ -153,10 +295,21 @@ class sillyAgent(basicAgent):
             myPos = successor.getAgentState(self.index).getPosition()
             minFoodDistance = min([self.getMazeDistance(myPos, food) for food in foodList])
             features['distanceToFood'] = minFoodDistance
+
         return features
 
     def getWeights(self, gameState, action):
         return {'successorScore': 100, 'distanceToFood': -1}
+
+    def chooseAction(self, gameState):
+
+
+        agentLocations = [gameState.getAgentPosition(i) for i in self.getOpponents(gameState)]
+        actions, po = self.aStarSearch(gameState.getAgentPosition(
+                             self.index), gameState, self.getFood(gameState).asList(), agentLocations, True)
+        draw(self, po)
+
+        return actions[0]
 
 
 
