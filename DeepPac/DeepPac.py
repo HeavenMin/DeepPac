@@ -115,7 +115,7 @@ class basicAgent(CaptureAgent):
         return features
 
     def getWeights(self, gameState, action):
-        return {'successorScore': 1}
+        return {'successorScore': 1.0}
 
 class sillyAgent(basicAgent):
 
@@ -123,12 +123,11 @@ class sillyAgent(basicAgent):
         features = util.Counter()
         successor = self.getSuccessor(gameState, action)
 
-        myState = successor.getAgentState(self.index)
-        myPos = myState.getPosition()
         foodList = self.getFood(successor).asList()
         features['successorScore'] = self.getScore(successor)
 
         if len(foodList) > 0:
+            myPos = successor.getAgentState(self.index).getPosition
             minFoodDistance = min([self.getMazeDistance(myPos, food) for food in foodList])
             features['distanceToFood'] = minFoodDistance
         return features
