@@ -86,7 +86,7 @@ class basicAgent(CaptureAgent):
             return self.backhome(gameState, actions)
         return random.choice(bestActions)
 
-    def backhome(self, gameState, acitons):
+    def backhome(self, gameState, actions):
         bestDist = 9999
         for action in actions:
             successor = self.getSuccessor(gameState, action)
