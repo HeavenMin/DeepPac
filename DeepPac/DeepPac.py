@@ -38,7 +38,7 @@ import game
 TEST_INFO_PRINT = True
 
 def createTeam(firstIndex, secondIndex, isRed,
-               first = 'DeepPacOffense', second = 'DefensiveReflexAgent'):
+               first = 'DeepPacOffense', second = 'DeepPacDefence '):
   """
   This function should return a list of two agents that will form the
   team, initialized using firstIndex and secondIndex as their agent
@@ -150,15 +150,14 @@ class basicAgent(CaptureAgent):
                            Directions.WEST: (-1, 0), Directions.NORTH: (0, 1)}
         self.enemyIndexs = self.getOpponents(gameState)
         self.ourAgentIndexs = self.getTeam(gameState)
-
-
+        self.enemyStartPosition = getAgentPosition(gameState, self.enemyIndexs[0])
 
 
         ######## Test Field #########
         if False:
             print('#####Test Field#####')
 
-            print(getEnemyPositions(gameState, self))
+            print(self.enemyStartPosition)
 
             print('######Test End######')
             exit()
@@ -326,11 +325,6 @@ class DeepPacOffense(basicAgent):
         else:
             features['escape'] = 0
 
-
-
-
-
-
         return features
 
     def getWeights(self, gameState, action):
@@ -342,13 +336,7 @@ class DeepPacOffense(basicAgent):
 
 
 
-
-
-
-
-
-# copy code need delete
-class DefensiveReflexAgent(basicAgent):
+class DeepPacDefence(basicAgent):
   """
   A reflex agent that keeps its side Pacman-free. Again,
   this is to give you an idea of what a defensive agent
@@ -362,6 +350,9 @@ class DefensiveReflexAgent(basicAgent):
 
     myState = successor.getAgentState(self.index)
     myPos = myState.getPosition()
+    mysuccessorPos = getAgentPosition(gameState, self.index)
+
+
 
     # Computes whether we're on defense (1) or offense (0)
     features['onDefense'] = 1
@@ -383,6 +374,8 @@ class DefensiveReflexAgent(basicAgent):
 
   def getWeights(self, gameState, action):
     return {'numInvaders': -1000, 'onDefense': 100, 'invaderDistance': -10, 'stop': -100, 'reverse': -2}
+
+  def chooseAction(self, gameState):
 
 
 #END
