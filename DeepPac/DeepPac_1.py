@@ -380,6 +380,7 @@ class sillyAgent(basicAgent):
             new_walls[new_wall[0]][new_wall[1]] = False
             if not has_path:
                 features['bottleneck'] = new_wall
+                features['abondonArea'] = close_set
                 if neareast_enemy is not None and (neareast_enemy - 1) / 2 < minFoodDistance:
                     features['avoidArea'] = 1
                     minFoodDistance = min(
@@ -389,7 +390,7 @@ class sillyAgent(basicAgent):
             exit_distance = self.getMazeDistance(myPos, self.bottleNeck)
             if neareast_enemy is not None and (neareast_enemy - 1) / 2 < exit_distance:
                 features['avoidArea'] = 1
-                self.food_abandon = self.food_abandon | close_set
+                self.food_abandon = self.food_abandon | self.close_set
                 minFoodDistance = min(
                     [len(self.aStarSearch(gameState, myPos, [food], enemyGhostLocations)[0]) for food in foodList if
                      food not in self.food_abandon] or [100])
@@ -431,10 +432,12 @@ class sillyAgent(basicAgent):
         if not self.in_neck_area and 'bottleneck' in action[1]:
             self.bottleNeck = action[1]['bottleneck']
             self.in_neck_area = True
+            self.close_set = action[1]['abondonArea']
         if self.in_neck_area and getAgentPosition(self.getSuccessor(gameState, action[0]),
                                                   self.index) == self.bottleNeck:
             self.bottleNeck = None
             self.in_neck_area = False
+            self.close_set = set()
         print "The action we choose is %s", action[0]
         return action[0]
 
