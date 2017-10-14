@@ -142,8 +142,7 @@ class basicAgent(CaptureAgent):
         self.width = self.walls.width
         self.height = self.walls.height
 
-
-
+        self.allActions = [Directions.EAST, Directions.SOUTH, Directions.WEST, Directions.NORTH]
 
 
 
@@ -153,7 +152,7 @@ class basicAgent(CaptureAgent):
         if False:
             print('#####Test Field#####')
 
-            print(self.opponents)
+            print(self.allActions)
 
             print('######Test End######')
             exit()
@@ -195,11 +194,8 @@ class basicAgent(CaptureAgent):
                 bestDist = dist
         return bestAction
 
-    def myaStarSearch(self, gameState, firstPos, goalPos):
-        walls = gameState.getWalls()
-        mapWidth = walls.width
-        mapHeight = walls.height
-        wallList = walls.asList()
+    def aStarSearch(self, gameState, nowPos, goalPos, enemyPos=[]):
+        pass
 
 
 
@@ -212,8 +208,7 @@ class basicAgent(CaptureAgent):
 
 
 
-
-    def aStarSearch(self, startPosition, gameState, goalPositions, avoidPositions=[], returnPosition=False):
+    def astarSearch(self, startPosition, gameState, goalPositions, avoidPositions=[], returnPosition=False):
         """
         Finds the distance between the agent with the given index and its nearest goalPosition
         """
@@ -320,7 +315,7 @@ class sillyAgent(basicAgent):
 
 
         agentLocations = [gameState.getAgentPosition(i) for i in self.getOpponents(gameState)]
-        actions, po = self.aStarSearch(gameState.getAgentPosition(
+        actions, po = self.astarSearch(gameState.getAgentPosition(
                              self.index), gameState, self.getFood(gameState).asList(), agentLocations, True)
         draw(self, po)
 
