@@ -224,8 +224,33 @@ class basicAgent(CaptureAgent):
                 bestDist = dist
         return bestAction
 
-    def aStarSearch(self, gameState, nowPos, goalPos, enemyPos=[]):
-        pass
+        # a aStar method to find the best path from start position to goal position
+
+    def aStarSearch(self, gameState, startPos, goalPos, enemyPos=[]):
+        nowPos = startPos
+        currentPath = []
+        currentCost = 0
+
+        # can also try util.manhattanDistance
+        nodeList = util.PriorityQueueWithFunction(lambda arg: arg[0] + self.mapArea
+        if arg[1] in enemyPos else 0 +
+                                   min(self.getMazeDistance(arg[1], position) for position in goalPos))
+        visitedList = set([nowPos])
+
+        while nowPos not in goalPos:
+            nextPositions = [((nowPos[0] + vec[0], nowPos[1] + vec[1]),
+                              action) for action, vec in self.allActions.items()]
+            legalPositions = [(p, a) for p, a in nextPositions if p not in self.wallsPosition]
+            for p, a in legalPositions:
+                if p not in visitedList:
+                    visitedList.add(p)
+                    nodeList.push((currentCost + 1, p, currentPath + [a]))
+
+            if len(nodeList.heap) == 0:
+                return None
+            else:
+                currentCost, nowPos, currentPath = nodeList.pop()
+        return currentPath, nowPos
 
     def astarSearch(self, startPosition, gameState, goalPositions, avoidPositions=[], returnPosition=False):
         """
@@ -351,15 +376,17 @@ class sillyAgent(basicAgent):
         successor = self.getSuccessor(gameState, action)
 
         foodList = self.getFood(successor).asList()
-        features['successorScore'] = -len(foodList)
         myPos = successor.getAgentState(self.index).getPosition()
-
-        # print checkPathExist(self.walls,getAgentPosition(gameState,self.index),foodList[0])
-        minFoodDistance = min(
-            [self.getMazeDistance(myPos, food) for food in foodList if food not in self.food_abandon] or [100])
-        features['distanceToFood'] = minFoodDistance
         if len(foodList) > 0:
-            myPos = successor.getAgentState(self.index).getPosition()
+            features['successorScore'] = -len(foodList)
+            # print checkPathExist(self.walls,getAgentPosition(gameState,self.index),foodList[0])
+            minFoodDistance = min(
+                [self.getMazeDistance(myPos, food) for food in foodList if food not in self.food_abandon] or [100])
+        if minFoodDistance == 100:
+            self.food_abandon = set()
+        features['distanceToFood'] = minFoodDistance
+
+        myPos = successor.getAgentState(self.index).getPosition()
         enemyGhostLocations = [gameState.getAgentPosition(i) for i in self.enemyIndices if
                                self.isGhost(gameState, i) and not self.isScared(gameState, i)]
 
@@ -368,13 +395,21 @@ class sillyAgent(basicAgent):
             a = [self.getMazeDistance(myPos, p) for p in enemyGhostLocations]
             neareast_enemy = min(a)
             if neareast_enemy <= 1:
-                features['avoidArea'] = 1
+                features['deadArea'] = 1
+        if isPacman(gameState,self.index) and getFoodCarry(gameState,self.index) > 1:
+            cur_position = getAgentPosition(gameState,self.index)
+            next_position = getAgentPosition(successor,self.index)
+            cur_return_distance = len(self.aStarSearch(gameState,cur_position,self.startPosition,enemyGhostLocations)[0])
+            next_return_distance = len(self.aStarSearch(gameState,next_position,self.startPosition,enemyGhostLocations)[0])
+            sub_return_distance = cur_return_distance - next_return_distance
+            features['return_home'] = 10 * getFoodCarry(gameState,self.index)
         if isPacman(gameState, self.index) and not self.in_neck_area:
             new_wall = getAgentPosition(gameState, self.index)
             pre_position = getAgentPosition(successor, self.index)
             new_walls = gameState.getWalls()
             new_walls[new_wall[0]][new_wall[1]] = True
             has_path, close_set = checkPathExist(new_walls, pre_position, self.startPosition)
+            new_walls[new_wall[0]][new_wall[1]] = False
             if not has_path:
                 features['bottleneck'] = new_wall
                 if neareast_enemy is not None and (neareast_enemy - 1) / 2 < minFoodDistance:
@@ -383,14 +418,12 @@ class sillyAgent(basicAgent):
                     minFoodDistance = min(
                         [self.getMazeDistance(myPos, food) for food in foodList if food not in self.food_abandon] or [
                             100])
-
-            new_walls[new_wall[0]][new_wall[1]] = False
         # print action
         features['distanceToFood'] = minFoodDistance
         return features
 
     def getWeights(self, gameState, action):
-        return {'successorScore': 100, 'distanceToFood': -1, 'attenuation': 0.8, 'avoidArea': -9999}
+        return {'successorScore': 100, 'distanceToFood': -1, 'attenuation': 0.8, 'deadArea': -99999, 'avoidArea': -9999,'return_home':2}
 
     def chooseAction(self, gameState):
         # agentLocations = [gameState.getAgentPosition(i) for i in self.getOpponents(gameState)]
@@ -411,8 +444,6 @@ class sillyAgent(basicAgent):
         # print(self.getSuccessorScore(gameState, bestActions[0]))
 
         # back home
-        if foodCarry >= 10:
-            return self.backhome(gameState, actions)
 
         action = bestActions[0]
         if 'bottleneck' in action[1]:
