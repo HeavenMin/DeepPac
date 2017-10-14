@@ -64,61 +64,6 @@ def createTeam(firstIndex, secondIndex, isRed,
 ##########
 # Agents #
 ##########
-
-# for debug, draw a debug square
-def draw(agent, positions, color='r'):
-    if color == 'r':
-        agent.debugDraw(positions, (.9, 0, 0), True)
-    if color == 'b':
-        agent.debugDraw(positions, (0, .3, .9), True)
-    if color == 'o':
-        agent.debugDraw(positions, (.98, .41, .07), True)
-    if color == 'g':
-        agent.debugDraw(positions, (.1, .75, .7), True)
-    if color == 'y':
-        agent.debugDraw(positions, (1.0, 0.6, 0.0), True)
-
-
-# a list of food you need to eat
-def getFood(gameState, agent):
-    return agent.getFood(gameState).asList()
-
-
-# a list of food you need to defend
-def getFoodYouAreDefending(gameState, agent):
-    return agent.getFoodYouAreDefending(gameState).asList()
-
-
-# int, num of food left
-def getFoodLeft(gameState, agent):
-    return len(agent.getFood(gameState).asList())
-
-
-# int, number of carrying food for a agent
-def getFoodCarry(gameState, agent_index):
-    return gameState.getAgentState(agent_index).numCarrying
-
-
-# True of False, if a agent is a pacman
-def isPacman(gameState, agent_index):
-    return gameState.getAgentState(agent_index).isPacman
-
-
-# int, the scared time for a ghost left
-def scaredTimeLeft(gameState, agent_index):
-    return gameState.getAgentState(agent_index).scaredTimer
-
-
-# (int, int) position(x, y)
-def getAgentPosition(gameState, agent_index):
-    return gameState.getAgentPosition(agent_index)
-
-
-# whether two agent are across corners
-def acrossCorners(pos1, pos2):
-    return abs(pos1[0] - pos2[0]) == 1 and abs(pos1[1] - pos2[1])
-
-
 def checkPathExist(walls, start, destination):
     fringe = util.Queue()
     fringe.push(start)
@@ -137,12 +82,62 @@ def checkPathExist(walls, start, destination):
     return False, close
 
 
+# for debug, draw a debug square
+def draw(agent, positions, color='r'):
+    if color == 'r':
+        agent.debugDraw(positions, (.9,0,0), True)
+    if color == 'b':
+        agent.debugDraw(positions, (0,.3,.9), True)
+    if color == 'o':
+        agent.debugDraw(positions, (.98,.41,.07), True)
+    if color == 'g':
+        agent.debugDraw(positions, (.1,.75,.7), True)
+    if color == 'y':
+        agent.debugDraw(positions, (1.0,0.6,0.0), True)
+
+# a list of food you need to eat
+def getFood(gameState, agent):
+    return agent.getFood(gameState).asList()
+
+# a list of food you need to defend
+def getFoodYouAreDefending(gameState, agent):
+    return agent.getFoodYouAreDefending(gameState).asList()
+
+# int, num of food left
+def getFoodLeft(gameState, agent):
+    return len(agent.getFood(gameState).asList())
+
+# int, number of carrying food for a agent
+def getFoodCarry(gameState, agent_index):
+    return gameState.getAgentState(agent_index).numCarrying
+
+# True of False, if a agent is a pacman
+def isPacman(gameState, agent_index):
+    return gameState.getAgentState(agent_index).isPacman
+
+# int, the scared time for a ghost left
+def getScaredTimeLeft(gameState, agent_index):
+    return gameState.getAgentState(agent_index).scaredTimer
+
+# (int, int) position(x, y)
+def getAgentPosition(gameState, agent_index):
+    return gameState.getAgentPosition(agent_index)
+
+# whether two agent are across corners, need to consider more
+def acrossCorners(pos1, pos2):
+    return abs(pos1[0] - pos2[0]) == 1 and abs(pos1[1] - pos2[1])
+
+# return a list
+def getEnemyPositions(gameState, agent):
+    return [getAgentPosition(gameState, index) for index in agent.getOpponents(gameState)]
+
 ###############################################################################
 ##################################  Our Agent #################################
 ###############################################################################
 
 class basicAgent(CaptureAgent):
-    # init
+
+    #init
     def registerInitialState(self, gameState):
         """
         This method handles the initial setup of the
@@ -171,43 +166,48 @@ class basicAgent(CaptureAgent):
         self.noWallsPosition = self.walls.asList(False)
         self.width = self.walls.width
         self.height = self.walls.height
-        self.enemyIndices = self.getOpponents(gameState)
+        self.mapArea = self.width * self.height
+        self.allActions = {Directions.EAST: (1, 0), Directions.SOUTH: (0, -1),
+                           Directions.WEST: (-1, 0), Directions.NORTH: (0, 1)}
+        self.enemyIndexs = self.getOpponents(gameState)
+        self.ourAgentIndexs = self.getTeam(gameState)
+        self.enemyStartPosition = getAgentPosition(gameState, self.enemyIndexs[0])
         self.bottleNeck = None
         self.food_abandon = set()
         self.in_neck_area = False
 
-        self.allActions = [Directions.EAST, Directions.SOUTH, Directions.WEST, Directions.NORTH]
 
         ######## Test Field #########
         if False:
             print('#####Test Field#####')
 
-            print(self.allActions)
+            print(self.enemyStartPosition)
 
             print('######Test End######')
             exit()
-            #############################
+        #############################
 
-    # important. for choosing the action
+    #important. for choosing the action
     def chooseAction(self, gameState):
-        # get legal action list
+        #get legal action list
         actions = gameState.getLegalActions(self.index)
+        #get num of food left
+        foodLeft = getFoodLeft(gameState, self)
+        foodCarry = getFoodCarry(gameState, self.index)
 
         # to evaluation time
         if TEST_INFO_PRINT:
             start_time = time.time()
         values = [self.evaluate(gameState, a) for a in actions]
         if TEST_INFO_PRINT:
-            print ('eval time for agent %d: %.4f' % (self.index, time.time() - start_time))
+            print 'eval time for agent %d: %.4f' % (self.index, time.time() - start_time)
 
         maxValue = max(values)
         bestActions = [a for a, v in zip(actions, values) if v == maxValue]
+        if TEST_INFO_PRINT:
+            print('agent', self.index, maxValue)
 
-        # get num of food left
-        foodLeft = getFoodLeft(gameState, self)
-        foodCarry = getFoodCarry(gameState, self.index)
-
-        # back home
+        #back home
         if foodCarry >= 4:
             return self.backhome(gameState, actions)
 
@@ -224,22 +224,21 @@ class basicAgent(CaptureAgent):
                 bestDist = dist
         return bestAction
 
-        # a aStar method to find the best path from start position to goal position
-
+    # a aStar method to find the best path from start position to goal position
     def aStarSearch(self, gameState, startPos, goalPos, enemyPos=[]):
         nowPos = startPos
         currentPath = []
         currentCost = 0
 
         # can also try util.manhattanDistance
-        nodeList = util.PriorityQueueWithFunction(lambda arg: arg[0] + self.mapArea
-        if arg[1] in enemyPos else 0 +
-                                   min(self.getMazeDistance(arg[1], position) for position in goalPos))
+        nodeList = util.PriorityQueueWithFunction(lambda arg:arg[0] + self.mapArea
+                    if arg[1] in enemyPos else 0 +
+                    min(self.getMazeDistance(arg[1], position) for position in goalPos))
         visitedList = set([nowPos])
 
         while nowPos not in goalPos:
             nextPositions = [((nowPos[0] + vec[0], nowPos[1] + vec[1]),
-                              action) for action, vec in self.allActions.items()]
+                            action) for action, vec in self.allActions.items()]
             legalPositions = [(p, a) for p, a in nextPositions if p not in self.wallsPosition]
             for p, a in legalPositions:
                 if p not in visitedList:
@@ -252,62 +251,7 @@ class basicAgent(CaptureAgent):
                 currentCost, nowPos, currentPath = nodeList.pop()
         return currentPath, nowPos
 
-    def astarSearch(self, startPosition, gameState, goalPositions, avoidPositions=[], returnPosition=False):
-        """
-        Finds the distance between the agent with the given index and its nearest goalPosition
-        """
-        walls = gameState.getWalls()
-        width = walls.width
-        height = walls.height
-        walls = walls.asList()
-
-        actions = [Directions.NORTH, Directions.SOUTH, Directions.EAST, Directions.WEST]
-        actionVectors = [Actions.directionToVector(action) for action in actions]
-        # Change action vectors to integers so they work correctly with indexing
-        actionVectors = [tuple(int(number) for number in vector) for vector in actionVectors]
-
-        # Values are stored a 3-tuples, (Position, Path, TotalCost)
-
-        currentPosition, currentPath, currentTotal = startPosition, [], 0
-        # Priority queue uses the maze distance between the entered point and its closest goal position to decide which comes first
-        queue = util.PriorityQueueWithFunction(lambda entry: entry[2] +  # Total cost so far
-                                                             width * height if entry[
-                                                                                   0] in avoidPositions else 0 +  # Avoid enemy locations like the plague
-                                                                                                             min(
-                                                                                                                 util.manhattanDistance(
-                                                                                                                     entry[
-                                                                                                                         0],
-                                                                                                                     endPosition)
-                                                                                                                 for
-                                                                                                                 endPosition
-                                                                                                                 in
-                                                                                                                 goalPositions))
-
-        # Keeps track of visited positions
-        visited = set([currentPosition])
-
-        while currentPosition not in goalPositions:
-
-            possiblePositions = [((currentPosition[0] + vector[0], currentPosition[1] + vector[1]), action) for
-                                 vector, action in zip(actionVectors, actions)]
-            legalPositions = [(position, action) for position, action in possiblePositions if position not in walls]
-
-            for position, action in legalPositions:
-                if position not in visited:
-                    visited.add(position)
-                    queue.push((position, currentPath + [action], currentTotal + 1))
-
-            # This shouldn't ever happen...But just in case...
-            if len(queue.heap) == 0:
-                return None
-            else:
-                currentPosition, currentPath, currentTotal = queue.pop()
-
-        if returnPosition:
-            return currentPath, currentPosition
-        else:
-            return currentPath
-
+    #Finds the next successor which is a grid position (location tuple).
     def getSuccessor(self, gameState, action):
         successor = gameState.generateSuccessor(self.index, action)
         pos = successor.getAgentState(self.index).getPosition()
@@ -317,11 +261,13 @@ class basicAgent(CaptureAgent):
         else:
             return successor
 
+    #Computes a linear combination of features and feature weights
     def evaluate(self, gameState, action):
         features = self.getFeatures(gameState, action)
         weights = self.getWeights(gameState, action)
         return features * weights
 
+    #Returns a counter of features for the state
     def getFeatures(self, gameState, action):
         features = util.Counter()
         successor = self.getSuccessor(gameState, action)
@@ -332,9 +278,9 @@ class basicAgent(CaptureAgent):
         return {'successorScore': 1.0}
 
     def getnearestOurFood(self, gameState):
-        our_food = self.getFoodYouAreDefending(gameState).asList()
+        our_food = getFoodYouAreDefending(gameState, self)
         our_food_distance = [self.getMazeDistance(gameState.getAgentPosition(
-            self.index), food) for food in our_food]
+                             self.index), food) for food in our_food]
 
         nearest_food = our_food[0]
         nearest_distance = our_food_distance[0]
@@ -387,22 +333,25 @@ class sillyAgent(basicAgent):
         features['distanceToFood'] = minFoodDistance
 
         myPos = successor.getAgentState(self.index).getPosition()
-        enemyGhostLocations = [gameState.getAgentPosition(i) for i in self.enemyIndices if
+        enemyGhostLocations = [gameState.getAgentPosition(i) for i in self.enemyIndexs if
                                self.isGhost(gameState, i) and not self.isScared(gameState, i)]
-
+        min_capsules_distance = min(
+            [self.getMazeDistance(myPos, food) for food in self.getCapsules(gameState)] or [100])
+        features['distanceToCapsules'] = min_capsules_distance * 0.5 * getFoodCarry(gameState,self.index)
         neareast_enemy = None
         if (len(enemyGhostLocations) > 0):
             a = [self.getMazeDistance(myPos, p) for p in enemyGhostLocations]
             neareast_enemy = min(a)
             if neareast_enemy <= 1:
                 features['deadArea'] = 1
+        self.getCapsules(gameState)
         if isPacman(gameState,self.index) and getFoodCarry(gameState,self.index) > 1:
             cur_position = getAgentPosition(gameState,self.index)
             next_position = getAgentPosition(successor,self.index)
-            cur_return_distance = len(self.aStarSearch(gameState,cur_position,self.startPosition,enemyGhostLocations)[0])
-            next_return_distance = len(self.aStarSearch(gameState,next_position,self.startPosition,enemyGhostLocations)[0])
+            cur_return_distance = len(self.aStarSearch(gameState,cur_position,[self.startPosition],enemyGhostLocations)[0])
+            next_return_distance = len(self.aStarSearch(gameState,next_position,[self.startPosition],enemyGhostLocations)[0])
             sub_return_distance = cur_return_distance - next_return_distance
-            features['return_home'] = 10 * getFoodCarry(gameState,self.index)
+            features['return_home'] = 10 * getFoodCarry(gameState,self.index) * sub_return_distance
         if isPacman(gameState, self.index) and not self.in_neck_area:
             new_wall = getAgentPosition(gameState, self.index)
             pre_position = getAgentPosition(successor, self.index)
@@ -420,10 +369,12 @@ class sillyAgent(basicAgent):
                             100])
         # print action
         features['distanceToFood'] = minFoodDistance
+        # print features
+        # print features * self.getWeights(gameState,action)
         return features
 
     def getWeights(self, gameState, action):
-        return {'successorScore': 100, 'distanceToFood': -1, 'attenuation': 0.8, 'deadArea': -99999, 'avoidArea': -9999,'return_home':2}
+        return {'distanceToCapsules':-0.5,'successorScore': 100, 'distanceToFood': -1, 'attenuation': 0.8, 'deadArea': -99999, 'avoidArea': -9999,'return_home':1}
 
     def chooseAction(self, gameState):
         # agentLocations = [gameState.getAgentPosition(i) for i in self.getOpponents(gameState)]
@@ -446,8 +397,12 @@ class sillyAgent(basicAgent):
         # back home
 
         action = bestActions[0]
-        if 'bottleneck' in action[1]:
+        if not self.in_neck_area and 'bottleneck' in action[1]:
             self.bottleNeck = action[1]['bottleneck']
+            self.in_neck_area = True
+        if self.in_neck_area and getAgentPosition(self.getSuccessor(gameState,action[0]),self.index) == self.bottleNeck:
+            self.bottleNeck = None
+            self.in_neck_area = False
         return action[0]
 
     def getSuccessorScore(self, gameState, action, depth=2):
