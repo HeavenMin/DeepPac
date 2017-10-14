@@ -1,6 +1,7 @@
 #!/usr/bin/env python2
 # -*- coding: utf-8 -*-
 
+
 """
  TEAM : DeepPac
  PURPOSE : for pacman
@@ -30,36 +31,56 @@ import random, time, util, sys
 from game import Directions, Actions
 from util import nearestPoint
 import game
+from copy import deepcopy
 
 #################
 # Team creation #
 #################
 
-TEST_INFO_PRINT = True
+TEST_INFO_PRINT = False
+
 
 def createTeam(firstIndex, secondIndex, isRed,
-               first = 'DeepPacOffense', second = 'DeepPacDefence '):
-  """
-  This function should return a list of two agents that will form the
-  team, initialized using firstIndex and secondIndex as their agent
-  index numbers.  isRed is True if the red team is being created, and
-  will be False if the blue team is being created.
+               first='sillyAgent', second='DeepPacDefence'):
+    """
+    This function should return a list of two agents that will form the
+    team, initialized using firstIndex and secondIndex as their agent
+    index numbers.  isRed is True if the red team is being created, and
+    will be False if the blue team is being created.
 
-  As a potentially helpful development aid, this function can take
-  additional string-valued keyword arguments ("first" and "second" are
-  such arguments in the case of this function), which will come from
-  the --redOpts and --blueOpts command-line arguments to capture.py.
-  For the nightly contest, however, your team will be created without
-  any extra arguments, so you should make sure that the default
-  behavior is what you want for the nightly contest.
-  """
+    As a potentially helpful development aid, this function can take
+    additional string-valued keyword arguments ("first" and "second" are
+    such arguments in the case of this function), which will come from
+    the --redOpts and --blueOpts command-line arguments to capture.py.
+    For the nightly contest, however, your team will be created without
+    any extra arguments, so you should make sure that the default
+    behavior is what you want for the nightly contest.
+    """
 
-  # The following line is an example only; feel free to change it.
-  return [eval(first)(firstIndex), eval(second)(secondIndex)]
+    # The following line is an example only; feel free to change it.
+    return [eval(first)(firstIndex), eval(second)(secondIndex)]
+
 
 ##########
 # Agents #
 ##########
+def checkPathExist(walls, start, destination):
+    fringe = util.Queue()
+    fringe.push(start)
+    close = set()
+    directs = [(1, 0), (-1, 0), (0, -1), (0, 1)]
+    while not fringe.isEmpty():
+        node = fringe.pop()
+        if node == destination:
+            return True, []
+        if node not in close:
+            close.add(node)
+            for direct in directs:
+                next_position = tuple((node[0] + direct[0], node[1] + direct[1]))
+                if not walls[next_position[0]][next_position[1]]:
+                    fringe.push(next_position)
+    return False, close
+
 
 # for debug, draw a debug square
 def draw(agent, positions, color='r'):
@@ -151,6 +172,9 @@ class basicAgent(CaptureAgent):
         self.enemyIndexs = self.getOpponents(gameState)
         self.ourAgentIndexs = self.getTeam(gameState)
         self.enemyStartPosition = getAgentPosition(gameState, self.enemyIndexs[0])
+        self.bottleNeck = None
+        self.food_abandon = set()
+        self.in_neck_area = False
 
 
         ######## Test Field #########
@@ -267,71 +291,129 @@ class basicAgent(CaptureAgent):
                 nearest_distance = our_food_distance[i]
         return nearest_food
 
+    def isGhost(self, gameState, index):
+        """
+        Returns true ONLY if we can see the agent and it's definitely a ghost
+        """
+        position = gameState.getAgentPosition(index)
+        if position is None:
+            return False
+        return not (gameState.isOnRedTeam(index) ^ (position[0] < gameState.getWalls().width / 2))
+
+    def isScared(self, gameState, index):
+        """
+        Says whether or not the given agent is scared
+        """
+        isScared = bool(gameState.data.agentStates[index].scaredTimer)
+        return isScared
+
+
 class sillyAgent(basicAgent):
+    def evaluate(self, gameState, action):
+        features = self.getFeatures(gameState, action)
+        weights = self.getWeights(gameState, action)
+        return features * weights, features
 
     def getFeatures(self, gameState, action):
         features = util.Counter()
+
+        if action == 'Stop':
+            features['stop'] = 1
         successor = self.getSuccessor(gameState, action)
 
         foodList = self.getFood(successor).asList()
-        features['successorScore'] = -len(foodList)
-
+        myPos = successor.getAgentState(self.index).getPosition()
         if len(foodList) > 0:
-            myPos = successor.getAgentState(self.index).getPosition()
-            minFoodDistance = min([self.getMazeDistance(myPos, food) for food in foodList])
-            features['distanceToFood'] = minFoodDistance
+            features['successorScore'] = -len(foodList)
+            # print checkPathExist(self.walls,getAgentPosition(gameState,self.index),foodList[0])
+            minFoodDistance = min(
+                [self.getMazeDistance(myPos, food) for food in foodList if food not in self.food_abandon] or [100])
+        if minFoodDistance == 100:
+            self.food_abandon = set()
+        features['distanceToFood'] = minFoodDistance
 
+        myPos = successor.getAgentState(self.index).getPosition()
+        enemyGhostLocations = [gameState.getAgentPosition(i) for i in self.enemyIndexs if
+                               self.isGhost(gameState, i) and not self.isScared(gameState, i)]
+        min_capsules_distance = min(
+            [self.getMazeDistance(myPos, food) for food in self.getCapsules(gameState)] or [100])
+        features['distanceToCapsules'] = min_capsules_distance * 0.5 * getFoodCarry(gameState,self.index)
+        neareast_enemy = None
+        if (len(enemyGhostLocations) > 0):
+            a = [self.getMazeDistance(myPos, p) for p in enemyGhostLocations]
+            neareast_enemy = min(a)
+            if neareast_enemy <= 1:
+                features['deadArea'] = 1
+        self.getCapsules(gameState)
+        if isPacman(gameState,self.index) and getFoodCarry(gameState,self.index) > 1:
+            cur_position = getAgentPosition(gameState,self.index)
+            next_position = getAgentPosition(successor,self.index)
+            cur_return_distance = len(self.aStarSearch(gameState,cur_position,[self.startPosition],enemyGhostLocations)[0])
+            next_return_distance = len(self.aStarSearch(gameState,next_position,[self.startPosition],enemyGhostLocations)[0])
+            sub_return_distance = cur_return_distance - next_return_distance
+            features['return_home'] = 10 * getFoodCarry(gameState,self.index) * sub_return_distance
+        if isPacman(gameState, self.index) and not self.in_neck_area:
+            new_wall = getAgentPosition(gameState, self.index)
+            pre_position = getAgentPosition(successor, self.index)
+            new_walls = gameState.getWalls()
+            new_walls[new_wall[0]][new_wall[1]] = True
+            has_path, close_set = checkPathExist(new_walls, pre_position, self.startPosition)
+            new_walls[new_wall[0]][new_wall[1]] = False
+            if not has_path:
+                features['bottleneck'] = new_wall
+                if neareast_enemy is not None and (neareast_enemy - 1) / 2 < minFoodDistance:
+                    self.food_abandon = self.food_abandon | close_set
+                    features['avoidArea'] = 1
+                    minFoodDistance = min(
+                        [self.getMazeDistance(myPos, food) for food in foodList if food not in self.food_abandon] or [
+                            100])
+        # print action
+        features['distanceToFood'] = minFoodDistance
+        # print features
+        # print features * self.getWeights(gameState,action)
         return features
 
     def getWeights(self, gameState, action):
-        return {'successorScore': 100, 'distanceToFood': -1}
+        return {'distanceToCapsules':-0.5,'successorScore': 100, 'distanceToFood': -1, 'attenuation': 0.8, 'deadArea': -99999, 'avoidArea': -9999,'return_home':1}
 
     def chooseAction(self, gameState):
+        # agentLocations = [gameState.getAgentPosition(i) for i in self.getOpponents(gameState)]
+        # actions, po = self.astarSearch(gameState.getAgentPosition(
+        #     self.index), gameState, self.getFood(gameState).asList(), agentLocations, True)
+        # draw(self, po)
 
+        actions = gameState.getLegalActions(self.index)
+        features = [self.getFeatures(gameState, a) for a in actions]
+        weight = self.getWeights(gameState, actions[0])
+        values = [feature * weight for feature in features]
+        # values = [self.evaluate(gameState, a) for a in actions]
+        # print 'eval time for agent %d: %.4f' % (self.index, time.time() - start)
 
-        enemyLocations = [gameState.getAgentPosition(i) for i in self.getOpponents(gameState)]
+        maxValue = max(values)
+        bestActions = [(a, f) for a, v, f in zip(actions, values, features) if v == maxValue]
+        foodCarry = getFoodCarry(gameState, self.index)
+        # print(self.getSuccessorScore(gameState, bestActions[0]))
 
-        actions, po = self.aStarSearch(gameState, getAgentPosition(gameState, self.index),
-                            getFood(gameState, self), enemyLocations)
-        draw(self, po)
+        # back home
 
-        return actions[0]
+        action = bestActions[0]
+        if not self.in_neck_area and 'bottleneck' in action[1]:
+            self.bottleNeck = action[1]['bottleneck']
+            self.in_neck_area = True
+        if self.in_neck_area and getAgentPosition(self.getSuccessor(gameState,action[0]),self.index) == self.bottleNeck:
+            self.bottleNeck = None
+            self.in_neck_area = False
+        return action[0]
 
-
-class DeepPacOffense(basicAgent):
-    def getFeatures(self, gameState, action):
-        features = util.Counter()
-        successor = self.getSuccessor(gameState, action)
-        foodList = getFood(successor, self)
-
-        myPos = getAgentPosition(successor, self.index)
-        minDisToFood = min([self.getMazeDistance(myPos, food) for food in foodList])
-
-        features['score'] = self.getScore(successor)
-        features['foodLeft'] = -len(foodList)
-        features['distanceToFood'] = minDisToFood
-
-
-        minEnemyDistance = self.mapArea
-        enemyPositions = getEnemyPositions(gameState, self)
-        for enemy in enemyPositions:
-            if enemy != None:
-                if self.getMazeDistance(myPos, enemy) < minEnemyDistance:
-                    minEnemyDistance = self.getMazeDistance(myPos, enemy)
-        print(minEnemyDistance)
-
-        if minEnemyDistance <= 3 :
-            features['escape'] = minEnemyDistance
+    def getSuccessorScore(self, gameState, action, depth=2):
+        if depth == 0:
+            return self.evaluate(gameState, action)
         else:
-            features['escape'] = 0
+            successor = self.getSuccessor(gameState, action)
+            actions = successor.getLegalActions(self.index)
+            return self.evaluate(gameState, action) + max(
+                [self.getSuccessorScore(successor, a, depth - 1) for a in actions])
 
-        return features
-
-    def getWeights(self, gameState, action):
-        return {'score': 1.0,
-                'foodLeft': 100,
-                'distanceToFood': -1.5,
-                'escape': -99}
 
 
 
@@ -376,6 +458,38 @@ class DeepPacDefence(basicAgent):
     return {'numInvaders': -1000, 'onDefense': 100, 'invaderDistance': -10, 'stop': -100, 'reverse': -2}
 
   def chooseAction(self, gameState):
+      actions = gameState.getLegalActions(self.index)
+      position = gameState.getAgentPosition(self.index)
+
+
+      ActionToDefence = []
+      _, foodPosition = self.aStarSearch(gameState, self.enemyStartPosition, getFoodYouAreDefending(gameState, self))
+      ActionToDefence, _ = self.aStarSearch(gameState, position, [foodPosition])
+
+      if position != foodPosition:
+          action = ActionToDefence[0]
+          ActionToDefence = ActionToDefence[1:]
+          return action
+
+      #get legal action list
+      actions = gameState.getLegalActions(self.index)
+      #get num of food left
+      foodLeft = getFoodLeft(gameState, self)
+      foodCarry = getFoodCarry(gameState, self.index)
+
+      # to evaluation time
+      if TEST_INFO_PRINT:
+          start_time = time.time()
+      values = [self.evaluate(gameState, a) for a in actions]
+      if TEST_INFO_PRINT:
+          print 'eval time for agent %d: %.4f' % (self.index, time.time() - start_time)
+
+      maxValue = max(values)
+      bestActions = [a for a, v in zip(actions, values) if v == maxValue]
+      if TEST_INFO_PRINT:
+          print('agent', self.index, maxValue)
+
+      return random.choice(bestActions)
 
 
 #END
