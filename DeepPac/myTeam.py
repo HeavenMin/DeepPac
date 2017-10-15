@@ -207,6 +207,7 @@ class basicAgent(CaptureAgent):
 
         self.initDefendFood = getFoodYouAreDefending(gameState, self)
 
+        self.pre_position = self.startPosition
         self.centreBoundary = self.width / 2
         self.isRedTeam = gameState.isOnRedTeam(self.index)
         if self.isRedTeam:
