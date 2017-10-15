@@ -39,7 +39,6 @@ from copy import deepcopy
 
 TEST_INFO_PRINT = False
 
-
 def createTeam(firstIndex, secondIndex, isRed,
                first='sillyAgent', second='DeepPacDefence'):
     """
@@ -83,17 +82,17 @@ def checkPathExist(walls, start, destination):
 
 
 # for debug, draw a debug square
-def draw(agent, positions, color='r'):
+def draw(agent, positions, color='r', keep=True):
     if color == 'r':
-        agent.debugDraw(positions, (.9, 0, 0), True)
+        agent.debugDraw(positions, (.9, 0, 0), keep)
     if color == 'b':
-        agent.debugDraw(positions, (0, .3, .9), True)
+        agent.debugDraw(positions, (0, .3, .9), keep)
     if color == 'o':
-        agent.debugDraw(positions, (.98, .41, .07), True)
+        agent.debugDraw(positions, (.98, .41, .07), keep)
     if color == 'g':
-        agent.debugDraw(positions, (.1, .75, .7), True)
+        agent.debugDraw(positions, (.1, .75, .7), keep)
     if color == 'y':
-        agent.debugDraw(positions, (1.0, 0.6, 0.0), True)
+        agent.debugDraw(positions, (1.0, 0.6, 0.0), keep)
 
 
 # a list of food you need to eat
@@ -187,14 +186,20 @@ class basicAgent(CaptureAgent):
 
         self.initDefendFood = getFoodYouAreDefending(gameState, self)
 
+        self.centreBoundary = self.width / 2
+        self.isRedTeam = gameState.isOnRedTeam(self.index)
+        if self.isRedTeam:
+            self.centreBoundary -= 1
+        self.homeEntries = [(x, y) for (x, y) in self.noWallsPosition if x == self.centreBoundary]
+
         ######## Test Field #########
-        if False:
+        if True:
             print('#####Test Field#####')
 
-            print(self.enemyStartPosition)
+            draw(self, self.homeEntries, color='r', keep=False)
 
             print('######Test End######')
-            exit()
+            # exit()
             #############################
 
     # important. for choosing the action
@@ -210,7 +215,7 @@ class basicAgent(CaptureAgent):
             start_time = time.time()
         values = [self.evaluate(gameState, a) for a in actions]
         if TEST_INFO_PRINT:
-            print 'eval time for basic agent %d: %.4f' % (self.index, time.time() - start_time)
+            print 'eval time for agent %d: %.4f' % (self.index, time.time() - start_time)
 
         maxValue = max(values)
         bestActions = [a for a, v in zip(actions, values) if v == maxValue]
@@ -234,7 +239,7 @@ class basicAgent(CaptureAgent):
                 bestDist = dist
         return bestAction
 
-    # a aStar method to find the best path from start position to goal positions
+    # a aStar method to find the best path from start position to goal position
     def aStarSearch(self, gameState, startPos, goalPos, enemyPos=[]):
         nowPos = startPos
         currentPath = []
@@ -326,8 +331,6 @@ class sillyAgent(basicAgent):
 
     def getFeatures(self, gameState, action):
         features = util.Counter()
-        if getAgentPosition(gameState, self.index) == self.startPosition:
-            print "you died"
 
         if action == 'Stop':
             features['stop'] = 1
@@ -382,6 +385,7 @@ class sillyAgent(basicAgent):
             new_walls[new_wall[0]][new_wall[1]] = False
             if not has_path:
                 features['bottleneck'] = new_wall
+                features['abondonArea'] = close_set
                 if neareast_enemy is not None and (neareast_enemy - 1) / 2 < minFoodDistance:
                     features['avoidArea'] = 1
                     minFoodDistance = min(
@@ -391,7 +395,7 @@ class sillyAgent(basicAgent):
             exit_distance = self.getMazeDistance(myPos, self.bottleNeck)
             if neareast_enemy is not None and (neareast_enemy - 1) / 2 < exit_distance:
                 features['avoidArea'] = 1
-                self.food_abandon = self.food_abandon | close_set
+                self.food_abandon = self.food_abandon | self.close_set
                 minFoodDistance = min(
                     [len(self.aStarSearch(gameState, myPos, [food], enemyGhostLocations)[0]) for food in foodList if
                      food not in self.food_abandon] or [100])
@@ -433,10 +437,12 @@ class sillyAgent(basicAgent):
         if not self.in_neck_area and 'bottleneck' in action[1]:
             self.bottleNeck = action[1]['bottleneck']
             self.in_neck_area = True
+            self.close_set = action[1]['abondonArea']
         if self.in_neck_area and getAgentPosition(self.getSuccessor(gameState, action[0]),
                                                   self.index) == self.bottleNeck:
             self.bottleNeck = None
             self.in_neck_area = False
+            self.close_set = set()
         print "The action we choose is %s", action[0]
         return action[0]
 
@@ -496,9 +502,9 @@ class DeepPacDefence(basicAgent):
       position = gameState.getAgentPosition(self.index)
       num_defendFoodLeft = len(getFoodYouAreDefending(gameState, self))
 
+      # to evaluation time
       if TEST_INFO_PRINT:
           start_time = time.time()
-
       if isPacman(gameState, self.enemyIndexs[0]) or isPacman(gameState, self.enemyIndexs[1]):
           e1Pos = getAgentPosition(gameState, self.enemyIndexs[0]) if getAgentPosition(gameState, self.enemyIndexs[0]) != None else self.enemyStartPosition
           e2Pos = getAgentPosition(gameState, self.enemyIndexs[1]) if getAgentPosition(gameState, self.enemyIndexs[1]) != None else self.enemyStartPosition
