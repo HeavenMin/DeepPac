@@ -41,7 +41,7 @@ TEST_INFO_PRINT = False
 
 
 def createTeam(firstIndex, secondIndex, isRed,
-               first='sillyAgent', second='DefensiveReflexAgent'):
+               first='sillyAgent', second='DeepPacDefence'):
     """
     This function should return a list of two agents that will form the
     team, initialized using firstIndex and secondIndex as their agent
@@ -185,6 +185,10 @@ class basicAgent(CaptureAgent):
         self.food_abandon = set()
         self.in_neck_area = False
 
+        self.initDefendFood = getFoodYouAreDefending(gameState, self)
+
+        self.pre_action = 'Stop'
+
         ######## Test Field #########
         if False:
             print('#####Test Field#####')
@@ -324,8 +328,8 @@ class sillyAgent(basicAgent):
 
     def getFeatures(self, gameState, action):
         features = util.Counter()
-        if getAgentPosition(gameState, self.index) == self.startPosition:
-            print "you died"
+
+        directions = [(0, 1), (0, -1), (1, 0), (-1, 0)]
 
         if action == 'Stop':
             features['stop'] = 1
@@ -335,20 +339,22 @@ class sillyAgent(basicAgent):
         myPos = successor.getAgentState(self.index).getPosition()
         enemyGhostLocations = [gameState.getAgentPosition(i) for i in self.enemyIndexs if
                                self.isGhost(gameState, i) and not self.isScared(gameState, i)]
+        enemyPossiblePosition = enemyGhostLocations[:]
+        for location in enemyGhostLocations:
+            for direction in directions:
+                enemyPossiblePosition.append((location[0] + direction[0], location[1] + direction[1]))
         if len(foodList) > 0:
             features['successorScore'] = -len(foodList)
             # print checkPathExist(self.walls,getAgentPosition(gameState,self.index),foodList[0])
             minFoodDistance = min(
-                [len(self.aStarSearch(gameState, myPos, [food], enemyGhostLocations)[0]) for food in foodList if
+                [len(self.aStarSearch(gameState, myPos, [food], enemyPossiblePosition)[0]) for food in foodList if
                  food not in self.food_abandon] or [100])
-            print minFoodDistance
+            # print minFoodDistance
         if minFoodDistance == 100:
             self.food_abandon = set()
         features['distanceToFood'] = minFoodDistance
 
         myPos = successor.getAgentState(self.index).getPosition()
-        enemyGhostLocations = [gameState.getAgentPosition(i) for i in self.enemyIndexs if
-                               self.isGhost(gameState, i) and not self.isScared(gameState, i)]
         min_capsules_distance = min(
             [self.getMazeDistance(myPos, food) for food in self.getCapsules(gameState)] or [100])
         features['distanceToCapsules'] = min_capsules_distance * 0.5 * getFoodCarry(gameState, self.index)
@@ -366,9 +372,9 @@ class sillyAgent(basicAgent):
             cur_position = getAgentPosition(gameState, self.index)
             next_position = getAgentPosition(successor, self.index)
             cur_return_distance = len(
-                self.aStarSearch(gameState, cur_position, [self.startPosition], enemyGhostLocations)[0])
+                self.aStarSearch(gameState, cur_position, [self.startPosition], enemyPossiblePosition)[0])
             next_return_distance = len(
-                self.aStarSearch(gameState, next_position, [self.startPosition], enemyGhostLocations)[0])
+                self.aStarSearch(gameState, next_position, [self.startPosition], enemyPossiblePosition)[0])
             sub_return_distance = cur_return_distance - next_return_distance
             features['return_home'] = 10 * getFoodCarry(gameState, self.index) * sub_return_distance
         if isPacman(gameState, self.index) and not self.in_neck_area:
@@ -396,23 +402,30 @@ class sillyAgent(basicAgent):
                      food not in self.food_abandon] or [100])
         # print action
         features['distanceToFood'] = minFoodDistance
+        if (self.pre_action == 'North' and action == 'South') or (self.pre_action == 'South' and action == 'North') or (
+                        self.pre_action == 'West' and action == 'East') or (
+                self.pre_action == 'East' and action == 'West'):
+            features['repeat_action'] = 1
         # print self.bottleNeck
         # print features * self.getWeights(gameState,action)
         # if 'deadArea' in features:
-        # print action
-        # print features
-        # print features * self.getWeights(gameState, action)
+        print action
+        print features
+        print features * self.getWeights(gameState, action)
         return features
 
     def getWeights(self, gameState, action):
         return {'distanceToCapsules': -0.5, 'successorScore': 100, 'distanceToFood': -1, 'attenuation': 0.8,
-                'deadArea': -99999, 'avoidArea': -9999, 'return_home': 1}
+                'deadArea': -99999, 'avoidArea': -9999, 'return_home': 1, 'repeat_action': -100}
 
     def chooseAction(self, gameState):
         # agentLocations = [gameState.getAgentPosition(i) for i in self.getOpponents(gameState)]
         # actions, po = self.astarSearch(gameState.getAgentPosition(
         #     self.index), gameState, self.getFood(gameState).asList(), agentLocations, True)
         # draw(self, po)
+        print getAgentPosition(gameState, self.index)
+        if getAgentPosition(gameState, self.index) == self.startPosition:
+            print "you died"
 
         actions = gameState.getLegalActions(self.index)
         features = [self.getFeatures(gameState, a) for a in actions]
@@ -439,6 +452,7 @@ class sillyAgent(basicAgent):
             self.in_neck_area = False
             self.close_set = set()
         print "The action we choose is %s", action[0]
+        self.pre_action = action[0]
         return action[0]
 
     def getSuccessorScore(self, gameState, action, depth=2):
@@ -451,8 +465,7 @@ class sillyAgent(basicAgent):
                 [self.getSuccessorScore(successor, a, depth - 1) for a in actions])
 
 
-# copy code need delete
-class DefensiveReflexAgent(basicAgent):
+class DeepPacDefence(basicAgent):
     """
     A reflex agent that keeps its side Pacman-free. Again,
     this is to give you an idea of what a defensive agent
@@ -469,7 +482,8 @@ class DefensiveReflexAgent(basicAgent):
 
         # Computes whether we're on defense (1) or offense (0)
         features['onDefense'] = 1
-        if myState.isPacman: features['onDefense'] = 0
+        if myState.isPacman:
+            features['onDefense'] = 0
 
         # Computes distance to invaders we can see
         enemies = [successor.getAgentState(i) for i in self.getOpponents(successor)]
@@ -479,13 +493,69 @@ class DefensiveReflexAgent(basicAgent):
             dists = [self.getMazeDistance(myPos, a.getPosition()) for a in invaders]
             features['invaderDistance'] = min(dists)
 
-        if action == Directions.STOP: features['stop'] = 1
+        if action == Directions.STOP:
+            features['stop'] = 1
         rev = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
-        if action == rev: features['reverse'] = 1
+        if action == rev:
+            features['reverse'] = 1
 
         return features
 
     def getWeights(self, gameState, action):
         return {'numInvaders': -1000, 'onDefense': 100, 'invaderDistance': -10, 'stop': -100, 'reverse': -2}
+
+    def chooseAction(self, gameState):
+        actions = gameState.getLegalActions(self.index)
+        position = gameState.getAgentPosition(self.index)
+        num_defendFoodLeft = len(getFoodYouAreDefending(gameState, self))
+
+        if TEST_INFO_PRINT:
+            start_time = time.time()
+
+        if isPacman(gameState, self.enemyIndexs[0]) or isPacman(gameState, self.enemyIndexs[1]):
+            e1Pos = getAgentPosition(gameState, self.enemyIndexs[0]) if getAgentPosition(gameState, self.enemyIndexs[
+                0]) != None else self.enemyStartPosition
+            e2Pos = getAgentPosition(gameState, self.enemyIndexs[1]) if getAgentPosition(gameState, self.enemyIndexs[
+                1]) != None else self.enemyStartPosition
+            if self.getMazeDistance(position, e1Pos) <= self.getMazeDistance(position, e2Pos):
+                _, foodPosition = self.aStarSearch(gameState, e1Pos, getFoodYouAreDefending(gameState, self))
+                ActionToDefence, _ = self.aStarSearch(gameState, position, [foodPosition])
+            else:
+                _, foodPosition = self.aStarSearch(gameState, e2Pos, getFoodYouAreDefending(gameState, self))
+                ActionToDefence, _ = self.aStarSearch(gameState, position, [foodPosition])
+        else:
+            _, foodPosition = self.aStarSearch(gameState, self.enemyStartPosition,
+                                               getFoodYouAreDefending(gameState, self))
+            ActionToDefence, _ = self.aStarSearch(gameState, position, [foodPosition])
+
+        if TEST_INFO_PRINT:
+            print 'eval defence time for agent %d: %.4f' % (self.index, time.time() - start_time)
+
+        if position != foodPosition:
+            action = ActionToDefence[0]
+            return action
+
+        # get legal action list
+        actions = gameState.getLegalActions(self.index)
+        # get num of food left
+        foodLeft = getFoodLeft(gameState, self)
+        foodCarry = getFoodCarry(gameState, self.index)
+
+        # to evaluation time
+        values = [self.evaluate(gameState, a) for a in actions]
+
+        maxValue = max(values)
+        bestActions = [a for a, v in zip(actions, values) if v == maxValue]
+        if TEST_INFO_PRINT:
+            print('agent', self.index, maxValue)
+
+        return random.choice(bestActions)
+
+    def isPacman(self, gameState, index):
+        # Returns true ONLY if we can see the agent and it's definitely a pacman
+        position = gameState.getAgentPosition(index)
+        if position is None:
+            return False
+        return not (gameState.isOnRedTeam(index) ^ (position[0] >= gameState.getWalls().width / 2))
 
 # END
