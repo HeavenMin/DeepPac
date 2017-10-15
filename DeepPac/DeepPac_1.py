@@ -101,7 +101,7 @@ def path_length_avoid_area(walls, start, destination, avoid_areas):
                 next_position = tuple((node[0] + direct[0], node[1] + direct[1]))
                 if not new_walls[next_position[0]][next_position[1]]:
                     fringe.push((next_position, length + 1))
-    return 9999
+    return 1000
 
 
 # for debug, draw a debug square
@@ -386,7 +386,7 @@ class sillyAgent(basicAgent):
                             in
                             foodList if
                             food not in self.food_abandon]
-            minFoodDistance = min(fooddistance or ([100], (0, 0)), key=lambda x: x[0])[0]
+            minFoodDistance = min(fooddistance or ([1000], (0, 0)), key=lambda x: x[0])[0]
             for distance, food in fooddistance:
                 if distance == minFoodDistance:
                     features['food'] = food
@@ -394,14 +394,12 @@ class sillyAgent(basicAgent):
                     #     if distance == minFoodDistance:
                     #         features['food'] = [food for food in foodList if food not in self.food_abandon][index]
                     # print minFoodDistance
-        if minFoodDistance == 100:
+        if minFoodDistance == 1000:
             self.food_abandon = set()
         features['distanceToFood'] = minFoodDistance
 
         min_capsules_distance = min(
-            [self.getMazeDistance(myPos, food) for food in self.getCapsules(gameState)] or [100])
-        if self.chased == True:
-            features['distanceToCapsules'] = min_capsules_distance * 10000
+            [self.getMazeDistance(myPos, food) for food in self.getCapsules(gameState)] or [1000])
         neareast_enemy = None
         if (len(enemyGhostLocations) > 0):
             # print myPos
@@ -422,6 +420,9 @@ class sillyAgent(basicAgent):
             next_return_distance = path_length_avoid_area(self.walls, myPos, self.startPosition, enemyPossiblePosition)
             sub_return_distance = cur_return_distance - next_return_distance
             features['return_home'] = 10 * getFoodCarry(gameState, self.index) * sub_return_distance
+        if self.chased == True and min_capsules_distance != 1000:
+            features['distanceToCapsules'] = min_capsules_distance * 10000
+            features['return_home'] = 1
         if isPacman(gameState, self.index) and not self.in_neck_area:
             new_wall = getAgentPosition(gameState, self.index)
             pre_position = getAgentPosition(successor, self.index)
@@ -460,9 +461,6 @@ class sillyAgent(basicAgent):
         # print self.bottleNeck
         # print features * self.getWeights(gameState,action)
         # if 'deadArea' in features:
-        print action
-        print features
-        print features * self.getWeights(gameState, action)
         return features
 
     def getWeights(self, gameState, action):
