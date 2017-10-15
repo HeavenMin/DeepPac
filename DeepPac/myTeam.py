@@ -7,6 +7,11 @@
  PURPOSE : for pacman
  VERSION : 1
  DATE : 10.2017
+
+ DeepPac Team member:
+ hongzhenx
+ kaifuJ
+ ming1
 """
 
 __author__ = 'DeepPac'
@@ -38,7 +43,6 @@ from copy import deepcopy
 #################
 
 TEST_INFO_PRINT = False
-
 
 def createTeam(firstIndex, secondIndex, isRed,
                first='DeepPacAttack', second='DeepPacDefence'):
@@ -100,7 +104,7 @@ def path_length_avoid_area(walls, start, destination, avoid_areas):
                 next_position = tuple((node[0] + direct[0], node[1] + direct[1]))
                 if not new_walls[next_position[0]][next_position[1]]:
                     fringe.push((next_position, length + 1))
-    return 9999
+    return 1000
 
 # for debug, draw a debug square
 def draw(agent, positions, color='r', keep=True):
@@ -214,6 +218,11 @@ class basicAgent(CaptureAgent):
             self.centreBoundary -= 1
         self.homeEntries = [(x, y) for (x, y) in self.noWallsPosition if x == self.centreBoundary]
 
+        self.food = None
+        self.food_try = 5
+        self.food_distance = None
+        self.chased = False
+
         ######## Test Field #########
         if False:
             print('#####Test Field#####')
@@ -237,7 +246,7 @@ class basicAgent(CaptureAgent):
             start_time = time.time()
         values = [self.evaluate(gameState, a) for a in actions]
         if TEST_INFO_PRINT:
-            print 'eval time for agent %d: %.4f' % (self.index, time.time() - start_time)
+            print 'eval time for basic agent %d: %.4f' % (self.index, time.time() - start_time)
 
         maxValue = max(values)
         bestActions = [a for a, v in zip(actions, values) if v == maxValue]
@@ -363,7 +372,7 @@ class DeepPacAttack(basicAgent):
 
         foodList = self.getFood(successor).asList()
         myPos = getAgentPosition(successor, self.index)
-        if getFoodCarry(successor,self.index) and myPos in self.homeEntries:
+        if getFoodCarry(successor, self.index) and myPos in self.homeEntries:
             features['back_home'] = 1000000
             return features
         enemyGhostLocations = [gameState.getAgentPosition(i) for i in self.enemyIndexs if
@@ -375,28 +384,37 @@ class DeepPacAttack(basicAgent):
         if len(foodList) > 0:
             features['successorScore'] = -len(foodList)
             # print checkPathExist(self.walls,getAgentPosition(gameState,self.index),foodList[0])
-            minFoodDistance = min(
-                [len(self.aStarSearch(gameState, myPos, [food], enemyPossiblePosition)[0]) for food in foodList if
-                 food not in self.food_abandon] or [100])
-            # print minFoodDistance
-        if minFoodDistance == 100:
+            fooddistance = [(len(self.aStarSearch(gameState, myPos, [food], enemyPossiblePosition)[0]), food) for food
+                            in
+                            foodList if
+                            food not in self.food_abandon]
+            minFoodDistance = min(fooddistance or ([1000], (0, 0)), key=lambda x: x[0])[0]
+            for distance, food in fooddistance:
+                if distance == minFoodDistance:
+                    features['food'] = food
+                    # for index, distance in enumerate(fooddistance):
+                    #     if distance == minFoodDistance:
+                    #         features['food'] = [food for food in foodList if food not in self.food_abandon][index]
+                    # print minFoodDistance
+        if minFoodDistance == 1000:
             self.food_abandon = set()
         features['distanceToFood'] = minFoodDistance
 
         min_capsules_distance = min(
-            [self.getMazeDistance(myPos, food) for food in self.getCapsules(gameState)] or [100])
-        features['distanceToCapsules'] = min_capsules_distance * 0.5 * getFoodCarry(gameState, self.index)
+            [self.getMazeDistance(myPos, food) for food in self.getCapsules(gameState)] or [1000])
         neareast_enemy = None
         if (len(enemyGhostLocations) > 0):
             # print myPos
             a = [self.getMazeDistance(myPos, p) for p in enemyGhostLocations]
+            features['nearest_enemy'] = a
             # print enemyGhostLocations
             # print a
             neareast_enemy = min(a)
             if myPos == self.startPosition or neareast_enemy <= 1:
                 features['deadArea'] = 10
         self.getCapsules(gameState)
-        if isPacman(gameState, self.index) and getFoodCarry(gameState, self.index) > 1:
+        if isPacman(gameState, self.index) and getFoodCarry(gameState, self.index) > 1 and (
+                        len(enemyGhostLocations) > 0 or self.getScore(gameState) <= 0):
             cur_position = getAgentPosition(gameState, self.index)
             next_position = myPos
             cur_return_distance = len(
@@ -404,12 +422,15 @@ class DeepPacAttack(basicAgent):
             next_return_distance = path_length_avoid_area(self.walls, myPos, self.startPosition, enemyPossiblePosition)
             sub_return_distance = cur_return_distance - next_return_distance
             features['return_home'] = 10 * getFoodCarry(gameState, self.index) * sub_return_distance
+        if self.chased == True and min_capsules_distance != 1000:
+            features['distanceToCapsules'] = min_capsules_distance * 10000
+            features['return_home'] = 1
         if isPacman(gameState, self.index) and not self.in_neck_area:
             new_wall = getAgentPosition(gameState, self.index)
             pre_position = getAgentPosition(successor, self.index)
             new_walls = gameState.getWalls()
             new_walls[new_wall[0]][new_wall[1]] = True
-            has_path, close_set = checkPathExist(new_walls, pre_position, self.startPosition)
+            has_path, close_set = checkPathExist(new_walls, pre_position, self.homeEntries[0])
             new_walls[new_wall[0]][new_wall[1]] = False
             if not has_path:
                 features['bottleneck'] = new_wall
@@ -422,12 +443,16 @@ class DeepPacAttack(basicAgent):
                          food not in self.food_abandon] or [100])
         if self.in_neck_area:
             exit_distance = self.getMazeDistance(myPos, self.bottleNeck)
-            if neareast_enemy is not None and (neareast_enemy - 1) / 2 < exit_distance:
-                features['avoidArea'] = 1
-                self.food_abandon = self.food_abandon | self.close_set
-                minFoodDistance = min(
-                    [len(self.aStarSearch(gameState, myPos, [food], enemyGhostLocations)[0]) for food in foodList if
-                     food not in self.food_abandon] or [100])
+
+            if neareast_enemy is not None:
+                if min([self.getMazeDistance(self.bottleNeck, enemy) for enemy in
+                        enemyGhostLocations]) - 1 <= exit_distance:
+                    features['avoidArea'] = 1
+                    self.food_abandon = self.food_abandon | self.close_set
+                    minFoodDistance = min(
+                        [len(self.aStarSearch(gameState, myPos, [food], enemyGhostLocations)[0]) for food in foodList if
+                         food not in self.food_abandon] or [100])
+                    features['return_home'] = features['return_home'] * 10
         # print action
         features['distanceToFood'] = minFoodDistance
         # if (self.pre_action == 'North' and action == 'South') or (self.pre_action == 'South' and action == 'North') or (
@@ -438,14 +463,11 @@ class DeepPacAttack(basicAgent):
         # print self.bottleNeck
         # print features * self.getWeights(gameState,action)
         # if 'deadArea' in features:
-        print action
-        print features
-        print features * self.getWeights(gameState, action)
         return features
 
     def getWeights(self, gameState, action):
-        return {'distanceToCapsules': -0.5, 'successorScore': 100, 'distanceToFood': -1, 'attenuation': 0.8,
-                'deadArea': -99999, 'avoidArea': -9999, 'return_home': 1, 'repeat_action': -100,'back_home':10}
+        return {'distanceToCapsules': -1, 'successorScore': 100, 'distanceToFood': -1, 'attenuation': 0.8,
+                'deadArea': -99999, 'avoidArea': -8999, 'return_home': 1, 'repeat_action': -100, 'back_home': 10}
 
     def chooseAction(self, gameState):
         # agentLocations = [gameState.getAgentPosition(i) for i in self.getOpponents(gameState)]
@@ -483,9 +505,39 @@ class DeepPacAttack(basicAgent):
             self.bottleNeck = None
             self.in_neck_area = False
             self.close_set = set()
+
+        if 'nearest_enemy' in action[1]:
+            if min(action[1]['nearest_enemy']) == 2:
+                self.chased = True
+            else:
+                self.chased = False
+        else:
+            self.chased = False
+        # print self.chased
         # print "The action we choose is %s", action[0]
         # self.pre_action = action[0]
         self.pre_position = position
+        # print action[1]['food']
+        if 'distanceToFood' in action[1]:
+            if self.food == action[1]['food']:
+                if self.food_distance <= action[1]['distanceToFood']:
+                    self.food_distance = action[1]['distanceToFood']
+                    self.food_try -= 1
+                    if self.food_try == 0:
+                        self.food = None
+                        self.food_abandon.add(action[1]['food'])
+                else:
+                    self.food_distance = action[1]['distanceToFood']
+                    self.food_try = 5
+
+            else:
+                self.food = action[1]['food']
+                self.food_try = 5
+                self.food_distance = action[1]['distanceToFood']
+        # print self.food_try
+        # print self.food_try
+        # print self.food
+        # print self.food_distance
         return action[0]
 
     def getSuccessorScore(self, gameState, action, depth=2):
@@ -496,8 +548,6 @@ class DeepPacAttack(basicAgent):
             actions = successor.getLegalActions(self.index)
             return self.evaluate(gameState, action) + max(
                 [self.getSuccessorScore(successor, a, depth - 1) for a in actions])
-
-
 
 
 class DeepPacDefence(basicAgent):
@@ -583,7 +633,7 @@ class DeepPacDefence(basicAgent):
           ActionToDefence, _ = self.aStarSearch(gameState, position, [foodPosition])
 
       if TEST_INFO_PRINT:
-          print 'eval defence time for agent %d: %.4f' % (self.index, time.time() - start_time)
+          print 'eval time for defence agent %d: %.4f' % (self.index, time.time() - start_time)
 
       if position != foodPosition:
           action = ActionToDefence[0]
@@ -600,8 +650,6 @@ class DeepPacDefence(basicAgent):
 
       maxValue = max(values)
       bestActions = [a for a, v in zip(actions, values) if v == maxValue]
-      if TEST_INFO_PRINT:
-          print('agent', self.index, maxValue)
 
       return random.choice(bestActions)
 
