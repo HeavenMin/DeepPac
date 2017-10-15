@@ -382,16 +382,17 @@ class sillyAgent(basicAgent):
         if len(foodList) > 0:
             features['successorScore'] = -len(foodList)
             # print checkPathExist(self.walls,getAgentPosition(gameState,self.index),foodList[0])
-            fooddistance = [(len(self.aStarSearch(gameState, myPos, [food], enemyPossiblePosition)[0]),food) for food in
+            fooddistance = [(len(self.aStarSearch(gameState, myPos, [food], enemyPossiblePosition)[0]), food) for food
+                            in
                             foodList if
                             food not in self.food_abandon]
-            minFoodDistance = min(fooddistance or ([100],(0,0)),key=lambda x:x[0])[0]
-            for distance,food in fooddistance:
+            minFoodDistance = min(fooddistance or ([100], (0, 0)), key=lambda x: x[0])[0]
+            for distance, food in fooddistance:
                 if distance == minFoodDistance:
                     features['food'] = food
-            # for index, distance in enumerate(fooddistance):
-            #     if distance == minFoodDistance:
-            #         features['food'] = [food for food in foodList if food not in self.food_abandon][index]
+                    # for index, distance in enumerate(fooddistance):
+                    #     if distance == minFoodDistance:
+                    #         features['food'] = [food for food in foodList if food not in self.food_abandon][index]
                     # print minFoodDistance
         if minFoodDistance == 100:
             self.food_abandon = set()
@@ -412,7 +413,8 @@ class sillyAgent(basicAgent):
             if myPos == self.startPosition or neareast_enemy <= 1:
                 features['deadArea'] = 10
         self.getCapsules(gameState)
-        if isPacman(gameState, self.index) and getFoodCarry(gameState, self.index) > 1:
+        if isPacman(gameState, self.index) and getFoodCarry(gameState, self.index) > 1 and (
+                len(enemyGhostLocations) > 0 or self.getScore(gameState) <= 0):
             cur_position = getAgentPosition(gameState, self.index)
             next_position = myPos
             cur_return_distance = len(
@@ -438,7 +440,7 @@ class sillyAgent(basicAgent):
                          food not in self.food_abandon] or [100])
         if self.in_neck_area:
             exit_distance = self.getMazeDistance(myPos, self.bottleNeck)
-            if neareast_enemy is not None and (neareast_enemy - 1) / 2 < exit_distance:
+            if neareast_enemy is not None and (neareast_enemy - 1) / 2 <= exit_distance:
                 features['avoidArea'] = 1
                 self.food_abandon = self.food_abandon | self.close_set
                 minFoodDistance = min(
@@ -461,7 +463,7 @@ class sillyAgent(basicAgent):
 
     def getWeights(self, gameState, action):
         return {'distanceToCapsules': -1, 'successorScore': 100, 'distanceToFood': -1, 'attenuation': 0.8,
-                'deadArea': -99999, 'avoidArea': -9999, 'return_home': 1, 'repeat_action': -100, 'back_home': 10}
+                'deadArea': -99999, 'avoidArea': -8999, 'return_home': 1, 'repeat_action': -100, 'back_home': 10}
 
     def chooseAction(self, gameState):
         # agentLocations = [gameState.getAgentPosition(i) for i in self.getOpponents(gameState)]
@@ -473,7 +475,6 @@ class sillyAgent(basicAgent):
         #     print "you died"
         if self.isGhost(gameState, self.index):
             self.food_abandon = set()
-
 
         actions = gameState.getLegalActions(self.index)
         features = [self.getFeatures(gameState, a) for a in actions]
@@ -508,7 +509,7 @@ class sillyAgent(basicAgent):
                 self.chased = False
         else:
             self.chased = False
-        print self.chased
+        # print self.chased
         # print "The action we choose is %s", action[0]
         # self.pre_action = action[0]
         self.pre_position = position
@@ -530,6 +531,9 @@ class sillyAgent(basicAgent):
                 self.food_try = 5
                 self.food_distance = action[1]['distanceToFood']
         # print self.food_try
+        # print self.food_try
+        # print self.food
+        # print self.food_distance
         return action[0]
 
     def getSuccessorScore(self, gameState, action, depth=2):
