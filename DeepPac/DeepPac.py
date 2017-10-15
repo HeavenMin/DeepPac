@@ -504,7 +504,15 @@ class DeepPacDefence(basicAgent):
 
       # if scared, wait in boundary
       if self.isScared(gameState, self.index):
+         if isPacman(gameState, self.enemyIndexs[0]):
+             e1Pos = getAgentPosition(gameState, self.enemyIndexs[0]) if getAgentPosition(gameState, self.enemyIndexs[0]) != None else self.enemyStartPosition
+             waitInBound, _ = self.aStarSearch(gameState, position, self.homeEntries, [e1Pos])
          waitInBound, _ = self.aStarSearch(gameState, position, self.homeEntries)
+         elif isPacman(gameState, self.enemyIndexs[1]):
+             e2Pos = getAgentPosition(gameState, self.enemyIndexs[1]) if getAgentPosition(gameState, self.enemyIndexs[1]) != None else self.enemyStartPosition
+             waitInBound, _ = self.aStarSearch(gameState, position, self.homeEntries, [e2Pos])
+         else:
+             waitInBound, _ = self.aStarSearch(gameState, position, self.homeEntries)
          if waitInBound != []:
              return waitInBound[0]
 
