@@ -210,6 +210,11 @@ class basicAgent(CaptureAgent):
         self.initDefendFood = getFoodYouAreDefending(gameState, self)
 
         self.pre_position = self.startPosition
+        self.centreBoundary = self.width / 2
+        self.isRedTeam = gameState.isOnRedTeam(self.index)
+        if self.isRedTeam:
+            self.centreBoundary -= 1
+        self.homeEntries = [(x, y) for (x, y) in self.noWallsPosition if x == self.centreBoundary]
 
         ######## Test Field #########
         if False:
@@ -360,6 +365,9 @@ class sillyAgent(basicAgent):
 
         foodList = self.getFood(successor).asList()
         myPos = getAgentPosition(successor, self.index)
+        if getFoodCarry(successor,self.index) and myPos in self.homeEntries:
+            features['back_home'] = 1000000
+            return features
         enemyGhostLocations = [gameState.getAgentPosition(i) for i in self.enemyIndexs if
                                self.isGhost(gameState, i) and not self.isScared(gameState, i)]
         enemyPossiblePosition = enemyGhostLocations[:]
@@ -410,6 +418,7 @@ class sillyAgent(basicAgent):
                 features['abondonArea'] = close_set
                 if neareast_enemy is not None and (neareast_enemy - 1) / 2 < minFoodDistance + 1:
                     features['avoidArea'] = 1
+                    self.food_abandon = self.food_abandon | close_set
                     minFoodDistance = min(
                         [len(self.aStarSearch(gameState, myPos, [food], enemyGhostLocations)[0]) for food in foodList if
                          food not in self.food_abandon] or [100])
@@ -438,7 +447,7 @@ class sillyAgent(basicAgent):
 
     def getWeights(self, gameState, action):
         return {'distanceToCapsules': -0.5, 'successorScore': 100, 'distanceToFood': -1, 'attenuation': 0.8,
-                'deadArea': -99999, 'avoidArea': -9999, 'return_home': 1, 'repeat_action': -100}
+                'deadArea': -99999, 'avoidArea': -9999, 'return_home': 1, 'repeat_action': -100,'back_home':10}
 
     def chooseAction(self, gameState):
         # agentLocations = [gameState.getAgentPosition(i) for i in self.getOpponents(gameState)]
@@ -448,6 +457,8 @@ class sillyAgent(basicAgent):
         # print getAgentPosition(gameState, self.index)
         # if getAgentPosition(gameState, self.index) == self.startPosition:
         #     print "you died"
+        if self.isGhost(gameState, self.index):
+            self.food_abandon = set()
 
         actions = gameState.getLegalActions(self.index)
         features = [self.getFeatures(gameState, a) for a in actions]
@@ -532,8 +543,6 @@ class DeepPacDefence(basicAgent):
         # actions = gameState.getLegalActions(self.index)
         position = gameState.getAgentPosition(self.index)
         # num_defendFoodLeft = len(getFoodYouAreDefending(gameState, self))
-        if self.isGhost(gameState, self.index):
-            self.food_abandon = set()
         if TEST_INFO_PRINT:
             start_time = time.time()
 
