@@ -210,7 +210,7 @@ class basicAgent(CaptureAgent):
             start_time = time.time()
         values = [self.evaluate(gameState, a) for a in actions]
         if TEST_INFO_PRINT:
-            print 'eval time for agent %d: %.4f' % (self.index, time.time() - start_time)
+            print 'eval time for basic agent %d: %.4f' % (self.index, time.time() - start_time)
 
         maxValue = max(values)
         bestActions = [a for a, v in zip(actions, values) if v == maxValue]
@@ -496,6 +496,9 @@ class DeepPacDefence(basicAgent):
       position = gameState.getAgentPosition(self.index)
       num_defendFoodLeft = len(getFoodYouAreDefending(gameState, self))
 
+      if TEST_INFO_PRINT:
+          start_time = time.time()
+
       if isPacman(gameState, self.enemyIndexs[0]) or isPacman(gameState, self.enemyIndexs[1]):
           e1Pos = getAgentPosition(gameState, self.enemyIndexs[0]) if getAgentPosition(gameState, self.enemyIndexs[0]) != None else self.enemyStartPosition
           e2Pos = getAgentPosition(gameState, self.enemyIndexs[1]) if getAgentPosition(gameState, self.enemyIndexs[1]) != None else self.enemyStartPosition
@@ -509,6 +512,9 @@ class DeepPacDefence(basicAgent):
           _, foodPosition = self.aStarSearch(gameState, self.enemyStartPosition, getFoodYouAreDefending(gameState, self))
           ActionToDefence, _ = self.aStarSearch(gameState, position, [foodPosition])
 
+      if TEST_INFO_PRINT:
+          print 'eval defence time for agent %d: %.4f' % (self.index, time.time() - start_time)
+
       if position != foodPosition:
           action = ActionToDefence[0]
           return action
@@ -520,11 +526,7 @@ class DeepPacDefence(basicAgent):
       foodCarry = getFoodCarry(gameState, self.index)
 
       # to evaluation time
-      if TEST_INFO_PRINT:
-          start_time = time.time()
       values = [self.evaluate(gameState, a) for a in actions]
-      if TEST_INFO_PRINT:
-          print 'eval time for agent %d: %.4f' % (self.index, time.time() - start_time)
 
       maxValue = max(values)
       bestActions = [a for a, v in zip(actions, values) if v == maxValue]
