@@ -414,7 +414,7 @@ class sillyAgent(basicAgent):
                 features['deadArea'] = 10
         self.getCapsules(gameState)
         if isPacman(gameState, self.index) and getFoodCarry(gameState, self.index) > 1 and (
-                len(enemyGhostLocations) > 0 or self.getScore(gameState) <= 0):
+                        len(enemyGhostLocations) > 0 or self.getScore(gameState) <= 0):
             cur_position = getAgentPosition(gameState, self.index)
             next_position = myPos
             cur_return_distance = len(
@@ -440,12 +440,16 @@ class sillyAgent(basicAgent):
                          food not in self.food_abandon] or [100])
         if self.in_neck_area:
             exit_distance = self.getMazeDistance(myPos, self.bottleNeck)
-            if neareast_enemy is not None and (neareast_enemy - 1) / 2 <= exit_distance:
-                features['avoidArea'] = 1
-                self.food_abandon = self.food_abandon | self.close_set
-                minFoodDistance = min(
-                    [len(self.aStarSearch(gameState, myPos, [food], enemyGhostLocations)[0]) for food in foodList if
-                     food not in self.food_abandon] or [100])
+
+            if neareast_enemy is not None:
+                if min([self.getMazeDistance(self.bottleNeck, enemy) for enemy in
+                        enemyGhostLocations]) - 1 <= exit_distance:
+                    features['avoidArea'] = 1
+                    self.food_abandon = self.food_abandon | self.close_set
+                    minFoodDistance = min(
+                        [len(self.aStarSearch(gameState, myPos, [food], enemyGhostLocations)[0]) for food in foodList if
+                         food not in self.food_abandon] or [100])
+                    features['return_home'] = features['return_home'] * 10
         # print action
         features['distanceToFood'] = minFoodDistance
         # if (self.pre_action == 'North' and action == 'South') or (self.pre_action == 'South' and action == 'North') or (
@@ -456,9 +460,9 @@ class sillyAgent(basicAgent):
         # print self.bottleNeck
         # print features * self.getWeights(gameState,action)
         # if 'deadArea' in features:
-        # print action
-        # print features
-        # print features * self.getWeights(gameState, action)
+        print action
+        print features
+        print features * self.getWeights(gameState, action)
         return features
 
     def getWeights(self, gameState, action):
