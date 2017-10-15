@@ -185,6 +185,8 @@ class basicAgent(CaptureAgent):
         self.food_abandon = set()
         self.in_neck_area = False
 
+        self.initDefendFood = getFoodYouAreDefending(gameState, self)
+
         ######## Test Field #########
         if False:
             print('#####Test Field#####')
@@ -465,13 +467,11 @@ class DeepPacDefence(basicAgent):
 
     myState = successor.getAgentState(self.index)
     myPos = myState.getPosition()
-    mysuccessorPos = getAgentPosition(gameState, self.index)
-
-
 
     # Computes whether we're on defense (1) or offense (0)
     features['onDefense'] = 1
-    if myState.isPacman: features['onDefense'] = 0
+    if myState.isPacman:
+        features['onDefense'] = 0
 
     # Computes distance to invaders we can see
     enemies = [successor.getAgentState(i) for i in self.getOpponents(successor)]
@@ -481,9 +481,11 @@ class DeepPacDefence(basicAgent):
       dists = [self.getMazeDistance(myPos, a.getPosition()) for a in invaders]
       features['invaderDistance'] = min(dists)
 
-    if action == Directions.STOP: features['stop'] = 1
+    if action == Directions.STOP:
+        features['stop'] = 1
     rev = Directions.REVERSE[gameState.getAgentState(self.index).configuration.direction]
-    if action == rev: features['reverse'] = 1
+    if action == rev:
+        features['reverse'] = 1
 
     return features
 
@@ -493,15 +495,29 @@ class DeepPacDefence(basicAgent):
   def chooseAction(self, gameState):
       actions = gameState.getLegalActions(self.index)
       position = gameState.getAgentPosition(self.index)
+      num_defendFoodLeft = len(getFoodYouAreDefending(gameState, self))
 
+      if TEST_INFO_PRINT:
+          start_time = time.time()
 
-      ActionToDefence = []
-      _, foodPosition = self.aStarSearch(gameState, self.enemyStartPosition, getFoodYouAreDefending(gameState, self))
-      ActionToDefence, _ = self.aStarSearch(gameState, position, [foodPosition])
+      if isPacman(gameState, self.enemyIndexs[0]) or isPacman(gameState, self.enemyIndexs[1]):
+          e1Pos = getAgentPosition(gameState, self.enemyIndexs[0]) if getAgentPosition(gameState, self.enemyIndexs[0]) != None else self.enemyStartPosition
+          e2Pos = getAgentPosition(gameState, self.enemyIndexs[1]) if getAgentPosition(gameState, self.enemyIndexs[1]) != None else self.enemyStartPosition
+          if self.getMazeDistance(position, e1Pos) <= self.getMazeDistance(position, e2Pos):
+              _, foodPosition = self.aStarSearch(gameState, e1Pos, getFoodYouAreDefending(gameState, self))
+              ActionToDefence, _ = self.aStarSearch(gameState, position, [foodPosition])
+          else:
+               _, foodPosition = self.aStarSearch(gameState, e2Pos, getFoodYouAreDefending(gameState, self))
+               ActionToDefence, _ = self.aStarSearch(gameState, position, [foodPosition])
+      else:
+          _, foodPosition = self.aStarSearch(gameState, self.enemyStartPosition, getFoodYouAreDefending(gameState, self))
+          ActionToDefence, _ = self.aStarSearch(gameState, position, [foodPosition])
+
+      if TEST_INFO_PRINT:
+          print 'eval defence time for agent %d: %.4f' % (self.index, time.time() - start_time)
 
       if position != foodPosition:
           action = ActionToDefence[0]
-          ActionToDefence = ActionToDefence[1:]
           return action
 
       #get legal action list
@@ -511,11 +527,7 @@ class DeepPacDefence(basicAgent):
       foodCarry = getFoodCarry(gameState, self.index)
 
       # to evaluation time
-      if TEST_INFO_PRINT:
-          start_time = time.time()
       values = [self.evaluate(gameState, a) for a in actions]
-      if TEST_INFO_PRINT:
-          print 'eval time for agent %d: %.4f' % (self.index, time.time() - start_time)
 
       maxValue = max(values)
       bestActions = [a for a, v in zip(actions, values) if v == maxValue]
@@ -523,6 +535,15 @@ class DeepPacDefence(basicAgent):
           print('agent', self.index, maxValue)
 
       return random.choice(bestActions)
+
+  def isPacman(self, gameState, index):
+      #Returns true ONLY if we can see the agent and it's definitely a pacman
+      position = gameState.getAgentPosition(index)
+      if position is None:
+          return False
+      return not (gameState.isOnRedTeam(index) ^ (position[0] >= gameState.getWalls().width / 2))
+
+
 
 
 #END
